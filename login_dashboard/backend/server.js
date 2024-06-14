@@ -1,11 +1,21 @@
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
+const sequelize = require('./sequelize');
+const User = require('./models/User');
+const { where } = require('sequelize');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+sequelize.sync()
+    .then(() => {
+        console.log('Database & tables created!');
+    })
+    .catch(err => {
+        console.error('Unable to connect to the database:', err);
+    });
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -13,39 +23,47 @@ const db = mysql.createConnection({
     database: 'signup'
 });
 
-app.post("/signup", (req, res) => {
-    const sql = "INSERT INTO login (`username`,`email`, `password`) VALUES(?)"
-    const values = [
-        req.body.username,
-        req.body.email,
-        req.body.password,
-    ]
-    console.log(values);
+app.post("/signup", async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        console.log("Signup request data:", req.body);
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+        const existingUser = await User.findOne({ where: { email } });
 
-    db.query(sql, [values], (err, data) => {
-        if (err) {
-            console.error(err)
-            return res.json("Error: " + err)
+        if (existingUser) {
+            alert(`User exist with ${existingUser}`);
+            return res.status(400).json({ error: "Email already exists" });
         }
-        return res.json(data)
-    })
-})
-app.post("/login", (req, res) => {
-    const sql = "SELECT * FROM login WHERE `email` = ? AND `password` = ?";
-    console.log("Login request received:", req.body);
-    db.query(sql, [req.body.email, req.body.password], (err, data) => {
-        if (err) {
-            console.error(err);
-            return res.json("Error: " + err)
+
+        const user = await User.create({ username, email, password });
+        return res.status(200).json({ user });
+    } catch (error) {
+        if (error instanceof Sequelize.UniqueConstraintError) {
+            return res.status(400).json({ error: "Email already exists" });
         }
-        if (data.length > 0) {
-            return res.json("Success")
+        console.error(error);
+        return res.status(500).json({ error: "Something went wrong" });
+
+    }
+});
+
+app.post("/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        console.log("Login request received:", req.body);
+        const user = await findOne({ where: { email, password } });
+        if (user) {
+            return res.json("Success");
         } else {
-            return res.json("Failed")
-
+            return res.json("Failed");
         }
-    })
-})
+    } catch (error) {
+        console.error("login error", error);
+        return res.status(500).json({ error: "Something went wrong" });
+    }
+});
 app.listen(8081, () => {
     console.log("listening on")
 })

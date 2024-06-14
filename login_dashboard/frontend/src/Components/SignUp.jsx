@@ -32,10 +32,16 @@ function SignUp() {
       axios
         .post("http://localhost:8081/signup", values)
         .then((res) => {
-          console.log(res.data); 
+          console.log(res.data);
           navigate("/");
         })
-        .catch((err) => console.error(err));
+        .catch((err) => {
+          if (err.response && err.response.status === 400) {
+            alert(err.response.data.error); // Alert the specific error message
+          } else {
+            console.error(err);
+          }
+        });
     }
   };
   return (
